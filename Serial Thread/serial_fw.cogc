@@ -1,0 +1,56 @@
+#include <propeller.h>
+#include "SerialBuffer.h"
+#include "utils.h"
+
+static _COGMEM unsigned int ubr;
+
+_NATIVE
+static void ShiftOut(char c)
+{
+  unsigned char i;
+  unsigned int nextcnt;
+
+  nextcnt = _CNT + ubr;
+
+  //Start condition
+  cbi(_OUTA, TX_PIN);
+  nextcnt = waitcnt2(nextcnt, ubr);
+
+  //Shift out the data
+  for(i = 0; i < 8; i++)
+  {
+    if(c & 0x01)
+      sbi(_OUTA, TX_PIN);
+    else
+      cbi(_OUTA, TX_PIN);
+
+    c >>= 1;
+
+    nextcnt = waitcnt2(nextcnt, ubr);
+  }
+
+  //Stop condition
+  sbi(_OUTA, TX_PIN);
+  nextcnt = waitcnt2(nextcnt, ubr); 
+}
+
+_NATIVE
+void main(struct SerialBuffer* buf)
+{
+  sbi(_DIRA, TX_PIN);
+  sbi(_OUTA, TX_PIN);
+
+  ubr = buf->ubr;
+
+  for(;;)
+  {
+    while(buf->txout != buf->txin)
+    {
+      ShiftOut(buf->txbuffer[buf->txout]);
+
+      buf->txout++;
+      buf->txout &= TX_BUFFER_SIZE - 1;
+    }   
+    //nextsync = waitcnt2(nextsync, SYNC_DELAY); 
+  }
+}
